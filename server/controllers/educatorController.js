@@ -3,7 +3,8 @@ import Course from '../models/Course.js';
 // Removed Purchase import
 import User from '../models/User.js';
 import { clerkClient } from '@clerk/express';
-import CourseProgress from '../models/CourseProgress.js'; // Import CourseProgress
+// In educatorController.js
+import { CourseProgress } from '../models/CourseProgress.js';
 
 // update role to educator
 export const updateRoleToEducator = async (req, res) => {

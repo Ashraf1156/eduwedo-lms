@@ -1,17 +1,32 @@
 import mongoose from 'mongoose';
 
 const courseProgressSchema = new mongoose.Schema({
-    userId: { type: String, required: true },
-    courseId: { type: String, required: true },
-    completed: { type: Boolean, default: false },
+    userId: { 
+        type: mongoose.Schema.Types.ObjectId, // Use ObjectId
+        required: true, 
+        ref: 'User' // Reference the 'User' model
+    },
+    courseId: { 
+        type: mongoose.Schema.Types.ObjectId, // Use ObjectId
+        required: true, 
+        ref: 'Course' // Reference the 'Course' model
+    },
+    completed: { 
+        type: Boolean, 
+        default: false 
+    },
     lectureCompleted: [
-        { type: String } // FIX: Define array content as array of strings (lectureIds)
+        { 
+            type: String // This is fine for storing lecture IDs (which might be sub-document IDs)
+        }
     ],
-    // ADD: Store last position
     lastPosition: {
         chapter: { type: Number, default: 0 },
         lecture: { type: Number, default: 0 }
     }
-}, { minimize: false });
+}, { 
+    minimize: false,
+    timestamps: true // ADD: Automatically adds createdAt and updatedAt timestamps
+});
 
 export const CourseProgress = mongoose.model('CourseProgress', courseProgressSchema);
