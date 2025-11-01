@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useRef, useState } from 'react';
 import { assets } from '../../assets/assets';
 import { toast } from 'react-toastify';
 import Quill from 'quill';
+import 'quill/dist/quill.snow.css'; // Import Quill styles
 import uniqid from 'uniqid';
 import axios from 'axios';
 import { AppContext } from '../../context/AppContext';
@@ -20,7 +21,7 @@ const logError = (message, error) => {
 };
 
 // =======================
-// YouTube URL Validation
+// URL Validation
 // =======================
 const validateYouTubeUrl = (url) => {
     const patterns = [
@@ -28,6 +29,17 @@ const validateYouTubeUrl = (url) => {
         /^[a-zA-Z0-9_-]{11}$/
     ];
     return patterns.some(pattern => pattern.test(url));
+};
+
+// NEW: Generic URL Validator
+const validateUrl = (url) => {
+    if (!url) return false;
+    try {
+        new URL(url);
+        return url.startsWith('http://') || url.startsWith('https://');
+    } catch (_) {
+        return false;
+    }
 };
 
 const AddCourse = () => {
@@ -90,7 +102,7 @@ const AddCourse = () => {
     const handleThumbnailChange = (e) => {
         const file = e.target.files[0];
         if (file) {
-            if (file.size > 2 * 1024 * 1024) {
+            if (file.size > 2 * 1024 * 1024) { // 2MB
                 toast.error('Image size should be less than 2MB');
                 return;
             }
@@ -103,7 +115,7 @@ const AddCourse = () => {
     };
 
     // =======================
-    // File Upload Handler
+    // File Upload Handler (for Thumbnail)
     // =======================
     const handleFileUpload = async (file, resourceType = 'auto') => {
         logInfo('Uploading file', { fileName: file.name, type: resourceType });
@@ -141,34 +153,12 @@ const AddCourse = () => {
     };
 
     // =======================
-    // Lecture Content Change
+    // UPDATED: Lecture Content Change
     // =======================
-    const handleLectureContentChange = async (e) => {
-        const { value, files } = e.target;
-
-        if (lectureDetails.lectureType === 'video') {
-            if (!validateYouTubeUrl(value)) {
-                toast.error('Please enter a valid YouTube URL');
-                return;
-            }
-            setLectureDetails(prev => ({ ...prev, lectureUrl: value }));
-        } else if (files && files[0]) {
-            const file = files[0];
-            if (file.type !== 'application/pdf') {
-                toast.error('Please upload a valid PDF file');
-                return;
-            }
-            if (file.size > 10 * 1024 * 1024) {
-                toast.error('PDF file size should be less than 10MB');
-                return;
-            }
-            try {
-                const url = await handleFileUpload(file, 'raw');
-                setLectureDetails(prev => ({ ...prev, lectureUrl: url }));
-            } catch (error) {
-                toast.error('File upload failed. Please try again.');
-            }
-        }
+    const handleLectureContentChange = (e) => {
+        const { value } = e.target;
+        // This function now simply updates the URL value for both videos and PDFs
+        setLectureDetails(prev => ({ ...prev, lectureUrl: value }));
     };
 
     // =======================
@@ -185,8 +175,9 @@ const AddCourse = () => {
             return;
         }
 
-        if (lectureDetails.lectureType === 'pdf' && !lectureDetails.lectureUrl) {
-            toast.error('Please upload a PDF file');
+        // UPDATED: Validation for PDF link instead of file upload
+        if (lectureDetails.lectureType === 'pdf' && !validateUrl(lectureDetails.lectureUrl)) {
+            toast.error('Please enter a valid PDF link (e.g., a Google Drive link)');
             return;
         }
 
@@ -200,6 +191,9 @@ const AddCourse = () => {
                             {
                                 ...lectureDetails,
                                 lectureId: uniqid(),
+                                // This logic is now perfect:
+                                // For 'video', it creates an embed link.
+                                // For 'pdf', it saves the direct link (e.g., Google Drive)
                                 lectureUrl:
                                     lectureDetails.lectureType === 'video'
                                         ? `https://www.youtube.com/embed/${getYouTubeVideoId(lectureDetails.lectureUrl)}`
@@ -271,6 +265,7 @@ const AddCourse = () => {
             const token = await getToken();
             if (!token) {
                 toast.error('Authentication failed. Please login again.');
+                setIsCreating(false);
                 return;
             }
 
@@ -486,7 +481,7 @@ const AddCourse = () => {
             {/* Add Lecture Popup */}
             {showPopup && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white p-6 rounded-lg w-96">
+                    <div className="bg-white p-6 rounded-lg w-full max-w-md">
                         <h3 className="text-lg font-medium mb-4">Add Lecture</h3>
 
                         <div className="space-y-4">
@@ -509,7 +504,7 @@ const AddCourse = () => {
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">
-                                    Duration (minutes)
+                                    Duration ({lectureDetails.lectureType === 'video' ? 'minutes' : 'est. minutes'})
                                 </label>
                                 <input
                                     type="number"
@@ -518,7 +513,7 @@ const AddCourse = () => {
                                     onChange={(e) =>
                                         setLectureDetails(prev => ({
                                             ...prev,
-                                            lectureDuration: e.target.value
+                                            lectureDuration: e.target.valueAsNumber || 0
                                         }))
                                     }
                                     className="mt-1 block w-full rounded-md border-gray-300"
@@ -541,34 +536,28 @@ const AddCourse = () => {
                                     className="mt-1 block w-full rounded-md border-gray-300"
                                 >
                                     <option value="video">YouTube Video</option>
-                                    <option value="pdf">PDF Document</option>
+                                    <option value="pdf">PDF Document Link</option>
                                 </select>
                             </div>
 
+                            {/* UPDATED: Replaced file input with a single URL/Text input */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">
-                                    {lectureDetails.lectureType === 'video' ? 'YouTube URL' : 'PDF File'}
+                                    {lectureDetails.lectureType === 'video' ? 'YouTube URL' : 'PDF Link'}
                                 </label>
-                                {lectureDetails.lectureType === 'video' ? (
-                                    <input
-                                        type="url"
-                                        value={lectureDetails.lectureUrl}
-                                        onChange={handleLectureContentChange}
-                                        placeholder="https://www.youtube.com/watch?v=..."
-                                        aria-label="Lecture Video URL"
-                                        className="mt-1 block w-full rounded-md border-gray-300"
-                                        required
-                                    />
-                                ) : (
-                                    <input
-                                        type="file"
-                                        accept=".pdf"
-                                        onChange={handleLectureContentChange}
-                                        aria-label="Lecture PDF Upload"
-                                        className="mt-1 block w-full text-sm text-gray-500"
-                                        required
-                                    />
-                                )}
+                                <input
+                                    type="url"
+                                    value={lectureDetails.lectureUrl}
+                                    onChange={handleLectureContentChange}
+                                    placeholder={
+                                        lectureDetails.lectureType === 'video'
+                                            ? 'https://www.youtube.com/watch?v=...'
+                                            : 'https://drive.google.com/file/d/...'
+                                    }
+                                    aria-label={lectureDetails.lectureType === 'video' ? "Lecture Video URL" : "Lecture PDF Link"}
+                                    className="mt-1 block w-full rounded-md border-gray-300"
+                                    required
+                                />
                             </div>
 
                             <div className="flex items-center">

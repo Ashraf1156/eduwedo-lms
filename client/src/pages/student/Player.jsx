@@ -1,7 +1,8 @@
 import React, { useContext, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { AppContext } from '../../context/AppContext';
-import { assets } from '../../assets/assets';
+// FIX: Corrected import paths to point to the 'src' directory
+import { AppContext } from '../../../src/context/AppContext';
+import { assets } from '../../../src/assets/assets';
 import { toast } from 'react-toastify';
 import axios from 'axios';
 
@@ -48,14 +49,14 @@ const Player = () => {
 
                 if (progressResponse.data.success) {
                     // FIX: progress data is in .progressData and ensure it's an object
-                    setProgress(progressResponse.data.progressData || {}); 
+                    setProgress(progressResponse.data.progressData || {});
                     if (progressResponse.data.progressData?.lastPosition) {
                         setCurrentChapter(progressResponse.data.progressData.lastPosition.chapter || 0);
                         setCurrentLecture(progressResponse.data.progressData.lastPosition.lecture || 0);
                     }
                 }
             } catch (error) {
-                toast.error(error.message || 'Failed to load course');
+                toast.error(error.response?.data?.message || error.message || 'Failed to load course');
                 navigate('/my-enrollments');
             } finally {
                 setIsLoading(false);
@@ -202,14 +203,17 @@ const Player = () => {
                 </div>
 
                 {/* Content Area */}
-                <div className="flex-1 p-4">
+                <div className="flex-1 p-4 overflow-y-auto">
                     {currentLectureData?.lectureType === 'pdf' ? (
                         // PDF Viewer
+                        // This `iframe` will now correctly display the Google Drive or other public PDF link
                         <div className="w-full h-full bg-white rounded-lg shadow">
                             <iframe
                                 src={currentLectureData.lectureUrl}
                                 title={currentLectureData.lectureTitle}
                                 className="w-full h-full rounded-lg"
+                                // Adding sandbox attributes for better security with external links
+                                sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
                             />
                         </div>
                     ) : (
@@ -219,6 +223,7 @@ const Player = () => {
                                 src={currentLectureData?.lectureUrl}
                                 title={currentLectureData?.lectureTitle}
                                 className="w-full h-full"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                 allowFullScreen
                             />
                         </div>
@@ -251,10 +256,12 @@ const Player = () => {
                             }
                         }}
                         className={`px-4 py-2 text-sm font-medium rounded-md ${
-                            isCompleted 
-                                ? 'bg-green-600 text-white'
+                            isCompleted
+                                ? 'bg-green-600 text-white cursor-default'
                                 : 'bg-blue-600 text-white hover:bg-blue-700'
                         }`}
+                        // Disable button if already completed
+                        disabled={isCompleted}
                     >
                         {isCompleted ? 'Completed' : 'Mark as Complete'}
                     </button>
@@ -282,3 +289,4 @@ const Player = () => {
 };
 
 export default Player;
+

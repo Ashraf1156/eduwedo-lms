@@ -28,7 +28,7 @@ export const getAllCourses = async (req, res) => {
 export const getCourseById = async (req, res) => {
   try {
     // FIX: Changed `id` to `courseId` to match the route param
-    const { courseId: id } = req.params; 
+    const { courseId: id } = req.params;
     const userId = req.user ? req.user._id : null;
 
     const course = await Course.findById(id).populate("educator", "-password");
@@ -55,7 +55,7 @@ export const getCourseById = async (req, res) => {
         chapterContent: chapter.chapterContent.map(lecture => ({
           ...lecture,
           // FIX: Only send URL if it's a preview
-          lectureUrl: lecture.isPreviewFree ? lecture.lectureUrl : "", 
+          lectureUrl: lecture.isPreviewFree ? lecture.lectureUrl : "",
         })),
       }));
     }
