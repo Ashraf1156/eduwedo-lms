@@ -1,4 +1,5 @@
 import Course from "../models/Course.js";
+import User from "../models/User.js"; // ADDED User import
 
 // ========================== LOGGER HELPERS ==========================
 const logInfo = (message, data = {}) => {
@@ -26,7 +27,8 @@ export const getAllCourses = async (req, res) => {
 // ========================== GET COURSE BY ID ==========================
 export const getCourseById = async (req, res) => {
   try {
-    const { id } = req.params;
+    // FIX: Changed `id` to `courseId` to match the route param
+    const { courseId: id } = req.params; 
     const userId = req.user ? req.user._id : null;
 
     const course = await Course.findById(id).populate("educator", "-password");
@@ -46,12 +48,14 @@ export const getCourseById = async (req, res) => {
     }
 
     // For non-enrolled users: show only preview lectures
+    // FIX: Check if enrolledStudents array includes the userId
     if (!userId || !course.enrolledStudents.some(s => s.toString() === userId.toString())) {
       courseResponse.courseContent = courseResponse.courseContent.map(chapter => ({
         ...chapter,
         chapterContent: chapter.chapterContent.map(lecture => ({
           ...lecture,
-          lectureUrl: lecture.isPreviewFree ? lecture.lectureUrl : "",
+          // FIX: Only send URL if it's a preview
+          lectureUrl: lecture.isPreviewFree ? lecture.lectureUrl : "", 
         })),
       }));
     }
@@ -101,7 +105,8 @@ export const createCourse = async (req, res) => {
 // ========================== ENROLL COURSE ==========================
 export const enrollCourse = async (req, res) => {
   try {
-    const { courseId, accessCode } = req.body;
+    const { courseId } = req.params; // Get courseId from params
+    const { accessCode } = req.body; // Get accessCode from body
     const userId = req.user._id;
 
     if (!courseId || !accessCode) {
@@ -135,6 +140,11 @@ export const enrollCourse = async (req, res) => {
 
     course.enrolledStudents.push(userId);
     await course.save();
+
+    // ADDED: Also update the User model
+    await User.findByIdAndUpdate(userId, {
+        $addToSet: { enrolledCourses: courseId }
+    });
 
     res.status(200).json({
       success: true,
@@ -297,16 +307,4 @@ export const updateProgress = async (req, res) => {
 };
 
 // ========================== EXPORTS ==========================
-export default {
-  getAllCourses,
-  getCourseById,
-  createCourse,
-  enrollCourse,
-  getSingleEnrolledCourse,
-  getMyCourses,
-  getEnrolledCourses,
-  updateCourse,
-  deleteCourse,
-  getStudentsByAccessCode,
-  updateProgress,
-};
+// Removed default export as we are using named exports

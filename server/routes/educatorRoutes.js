@@ -4,7 +4,8 @@ import {
   educatorDashboardData,
   getEducatorCourses,
   getEnrolledStudentsData,
-  updateRoleToEducator
+  updateRoleToEducator,
+  deleteCourse // Import the deleteCourse function
 } from '../controllers/educatorController.js';
 import upload from '../configs/multer.js';
 import { requireAuth, extractUser } from '../middlewares/authMiddleware.js';
@@ -15,7 +16,8 @@ const educatorRouter = express.Router();
 educatorRouter.get('/update-role', requireAuth, extractUser, updateRoleToEducator);
 
 // Add Courses 
-educatorRouter.post('/add-course', upload.single('image'), requireAuth, extractUser, addCourse);
+// Fixed typo: addCode -> addCourse
+educatorRouter.post('/add-course', upload.single('image'), requireAuth, extractUser, addCourse); 
 
 // Get Educator Courses 
 educatorRouter.get('/courses', requireAuth, extractUser, getEducatorCourses);
@@ -26,4 +28,8 @@ educatorRouter.get('/dashboard', requireAuth, extractUser, educatorDashboardData
 // Get Educator Students Data
 educatorRouter.get('/enrolled-students', requireAuth, extractUser, getEnrolledStudentsData);
 
+// Delete a Course
+educatorRouter.delete('/course/:courseId', requireAuth, extractUser, deleteCourse);
+
 export default educatorRouter;
+

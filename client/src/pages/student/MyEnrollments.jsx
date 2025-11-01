@@ -28,13 +28,15 @@ const MyEnrollments = () => {
                     return;
                 }
 
-                const response = await axios.get(`${backendUrl}/api/course/enrolled`, {
+                // FIX: Changed endpoint from /api/course/enrolled to /api/user/enrolled-courses
+                // This call was the likely cause of the CastError
+                const response = await axios.get(`${backendUrl}/api/user/enrolled-courses`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
                 if (response.data.success) {
-                    setEnrolledCourses(response.data.courses);
-                    setFilteredCourses(response.data.courses);
+                    setEnrolledCourses(response.data.enrolledCourses);
+                    setFilteredCourses(response.data.enrolledCourses);
                 }
             } catch (error) {
                 toast.error('Failed to fetch enrolled courses');
@@ -54,7 +56,8 @@ const MyEnrollments = () => {
                 if (!token) return;
 
                 const progressPromises = enrolledCourses.map(course =>
-                    axios.get(`${backendUrl}/api/progress/${course._id}`, {
+                    // FIX: Changed endpoint to /api/user/get-course-progress and method to POST
+                    axios.post(`${backendUrl}/api/user/get-course-progress`, { courseId: course._id }, {
                         headers: { 'Authorization': `Bearer ${token}` }
                     })
                 );
@@ -65,7 +68,8 @@ const MyEnrollments = () => {
                 progressResponses.forEach((response, index) => {
                     if (response.data.success) {
                         const courseId = enrolledCourses[index]._id;
-                        newProgressData[courseId] = response.data.progress;
+                        // FIX: progress data is in response.data.progressData from userController
+                        newProgressData[courseId] = response.data.progressData; 
                     }
                 });
 
@@ -121,9 +125,16 @@ const MyEnrollments = () => {
     const calculateProgress = (courseId) => {
         const progress = progressData[courseId];
         if (!progress) return 0;
-
-        const totalLectures = progress.totalLectures || 0;
-        const completedLectures = progress.completedLectures?.length || 0;
+        
+        // Find total lectures in the course
+        const course = enrolledCourses.find(c => c._id === courseId);
+        if (!course) return 0;
+        
+        const totalLectures = course.courseContent?.reduce((total, chapter) => 
+            total + (chapter.chapterContent?.length || 0), 0
+        ) || 0;
+        
+        const completedLectures = progress.lectureCompleted?.length || 0;
 
         if (totalLectures === 0) return 0;
         return Math.round((completedLectures / totalLectures) * 100);
@@ -191,7 +202,7 @@ const MyEnrollments = () => {
                                 {/* Course Thumbnail */}
                                 <div className="relative aspect-video">
                                     <img
-                                        src={course.courseThumbnail || assets.thumbnail_placeholder}
+                                        src={course.courseThumbnail || assets.course_1_thumbnail} // FIX: Fallback asset
                                         alt={course.courseTitle}
                                         className="w-full h-full object-cover"
                                     />
@@ -209,7 +220,7 @@ const MyEnrollments = () => {
                                             chapter.chapterContent.some(lecture => lecture.lectureType === 'pdf')
                                         ) && (
                                             <span className="bg-black/70 text-white px-2 py-1 rounded-md text-xs flex items-center gap-1">
-                                                <img src={assets.pdf_icon} alt="" className="w-3 h-3" />
+                                                <img src={assets.lesson_icon} alt="" className="w-3 h-3" /> {/* Using lesson as pdf icon */}
                                                 PDF
                                             </span>
                                         )}
@@ -273,7 +284,7 @@ const MyEnrollments = () => {
                 </div>
             ) : (
                 <div className="text-center py-12">
-                    <img src={assets.no_data} alt="No courses" className="w-32 h-32 mx-auto mb-4" />
+                    <img src={assets.my_course_icon} alt="No courses" className="w-32 h-32 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">No courses found</h3>
                     <p className="text-sm text-gray-500">
                         {enrolledCourses.length === 0

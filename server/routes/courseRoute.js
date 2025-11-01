@@ -6,8 +6,11 @@ import {
   enrollCourse,
   getEnrolledCourses,
   updateProgress,
+  createCourse, // ADDED
+  getSingleEnrolledCourse // ADDED
 } from "../controllers/courseController.js";
-import { requireAuth } from "@clerk/express";
+// FIX: Import auth middleware
+import { requireAuth, extractUser } from "../middlewares/authMiddleware.js"; 
 
 const router = express.Router();
 
@@ -16,16 +19,23 @@ const router = express.Router();
 // 🟢 Get all published courses
 router.get("/all", getAllCourses);
 
-// 🟢 Get enrolled courses for a specific user
-router.get("/user/:userId/enrolled", requireAuth(), getEnrolledCourses);
+// 🟢 Get single enrolled course (for Player)
+// This must come before /details/:courseId
+router.get("/enrolled/:id", requireAuth, extractUser, getSingleEnrolledCourse);
+
+// 🟢 Get enrolled courses for a specific user (This is NOT used by client)
+router.get("/user/:userId/enrolled", requireAuth, extractUser, getEnrolledCourses);
 
 // 🟢 Enroll in a course
-router.post("/:courseId/enroll", requireAuth(), enrollCourse);
+router.post("/:courseId/enroll", requireAuth, extractUser, enrollCourse);
 
-// 🟢 Update progress in a course
-router.put("/:courseId/progress", requireAuth(), updateProgress);
+// 🟢 Update progress in a course (This is NOT used by client)
+router.put("/:courseId/progress", requireAuth, extractUser, updateProgress);
 
-// 🟢 Get single course by ID (keep this LAST to avoid conflicts)
+// 🟢 Get single course by ID (for public CourseDetails page)
 router.get("/details/:courseId", getCourseById);
+
+// 🟢 Create a new course
+router.post("/create", requireAuth, extractUser, createCourse);
 
 export default router;

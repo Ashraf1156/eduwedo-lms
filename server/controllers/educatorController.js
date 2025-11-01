@@ -3,6 +3,7 @@ import Course from '../models/Course.js';
 // Removed Purchase import
 import User from '../models/User.js';
 import { clerkClient } from '@clerk/express';
+import CourseProgress from '../models/CourseProgress.js'; // Import CourseProgress
 
 // update role to educator
 export const updateRoleToEducator = async (req, res) => {
@@ -38,9 +39,19 @@ export const addCourse = async (req, res) => {
 
         const newCourse = await Course.create(parsedCourseData);
 
-        const imageUpload = await cloudinary.uploader.upload(imageFile.path);
+        // Upload image and get public_id
+        const imageUpload = await cloudinary.uploader.upload(imageFile.path, {
+            folder: "course_thumbnails" // Optional: organize in Cloudinary
+        });
+        
         newCourse.courseThumbnail = imageUpload.secure_url;
+        // Assuming you have added this field to your Course model:
+        // courseThumbnailPublicId: { type: String }
+        // newCourse.courseThumbnailPublicId = imageUpload.public_id; // Save public_id
 
+        // Note: This delete logic assumes you store public_ids for lectures
+        // If not, you'll need to update addCourse to save them.
+        
         await newCourse.save();
 
         res.json({ success: true, message: 'Course Added' });
@@ -61,6 +72,80 @@ export const getEducatorCourses = async (req, res) => {
         res.json({ success: false, message: error.message });
     }
 };
+
+// =================================================================
+// === ADD THIS FUNCTION ===========================================
+// =================================================================
+// Delete Educator Course
+export const deleteCourse = async (req, res) => {
+    try {
+        const { courseId } = req.params;
+        const educatorId = req.auth.userId;
+
+        // 1. Find the course
+        const course = await Course.findById(courseId);
+        if (!course) {
+            return res.status(404).json({ success: false, message: 'Course not found' });
+        }
+
+        // 2. Check ownership
+        if (course.educator.toString() !== educatorId) {
+            return res.status(403).json({ success: false, message: 'Unauthorized: You do not own this course' });
+        }
+
+        // 3. Delete Cloudinary Assets (Thumbnail, Videos, PDFs)
+        
+        // Delete thumbnail
+        // This requires 'courseThumbnailPublicId' to be saved in your Course model
+        if (course.courseThumbnailPublicId) {
+             try {
+                await cloudinary.uploader.destroy(course.courseThumbnailPublicId, { resource_type: "image" });
+             } catch (err) {
+                 console.error(`Failed to delete thumbnail ${course.courseThumbnailPublicId}:`, err.message);
+             }
+        }
+        
+        // Delete lecture assets
+        // This relies on 'lecturePublicId' and 'lectureType' being saved on the lecture object
+        for (const chapter of course.courseContent) {
+            for (const lecture of chapter.chapterContent) {
+                if (lecture.lecturePublicId) {
+                     try {
+                        await cloudinary.uploader.destroy(lecture.lecturePublicId, { 
+                            // Determine resource type based on lecture type
+                            resource_type: lecture.lectureType === 'pdf' ? 'raw' : 'video' 
+                        });
+                     } catch (err) {
+                        // Log if a single asset fails, but don't stop the whole process
+                        console.error(`Failed to delete asset ${lecture.lecturePublicId}:`, err.message);
+                     }
+                }
+            }
+        }
+
+        // 4. Delete associated CourseProgress documents
+        await CourseProgress.deleteMany({ courseId: courseId });
+
+        // 5. Remove course from all enrolled users' 'enrolledCourses' array
+        await User.updateMany(
+            { enrolledCourses: courseId },
+            { $pull: { enrolledCourses: courseId } }
+        );
+
+        // 6. Delete the course itself
+        await Course.findByIdAndDelete(courseId);
+
+        res.json({ success: true, message: 'Course and all associated data deleted successfully' });
+
+    } catch (error) {
+        console.error("Error deleting course:", error); // Log the full error on the server
+        res.status(500).json({ success: false, message: error.message || 'Server error during course deletion' });
+    }
+};
+// =================================================================
+// === END OF ADDED FUNCTION =======================================
+// =================================================================
+
 
 // Get Educator Dashboard Data ( Total Earning, Enrolled Students, No. of Courses)
 export const educatorDashboardData = async (req, res) => {
@@ -150,3 +235,4 @@ export const getEnrolledStudentsData = async (req, res) => {
         });
     }
 };
+

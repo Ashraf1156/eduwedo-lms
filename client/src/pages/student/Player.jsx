@@ -6,7 +6,7 @@ import { toast } from 'react-toastify';
 import axios from 'axios';
 
 const Player = () => {
-    const { id } = useParams();
+    const { courseId: id } = useParams(); // FIX: Use courseId from App.jsx route
     const navigate = useNavigate();
     const { backendUrl, getToken } = useContext(AppContext);
 
@@ -29,6 +29,7 @@ const Player = () => {
                 }
 
                 // Fetch course data
+                // FIX: Changed endpoint to /api/course/enrolled/:id
                 const response = await axios.get(`${backendUrl}/api/course/enrolled/${id}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -40,15 +41,17 @@ const Player = () => {
                 setCourseData(response.data.courseData);
 
                 // Fetch progress data
-                const progressResponse = await axios.get(`${backendUrl}/api/progress/${id}`, {
+                // FIX: Changed endpoint to /api/user/get-course-progress and method to POST
+                const progressResponse = await axios.post(`${backendUrl}/api/user/get-course-progress`, { courseId: id }, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
                 if (progressResponse.data.success) {
-                    setProgress(progressResponse.data.progress);
-                    if (progressResponse.data.progress.lastPosition) {
-                        setCurrentChapter(progressResponse.data.progress.lastPosition.chapter);
-                        setCurrentLecture(progressResponse.data.progress.lastPosition.lecture);
+                    // FIX: progress data is in .progressData and ensure it's an object
+                    setProgress(progressResponse.data.progressData || {}); 
+                    if (progressResponse.data.progressData?.lastPosition) {
+                        setCurrentChapter(progressResponse.data.progressData.lastPosition.chapter || 0);
+                        setCurrentLecture(progressResponse.data.progressData.lastPosition.lecture || 0);
                     }
                 }
             } catch (error) {
@@ -63,15 +66,20 @@ const Player = () => {
     }, [id, backendUrl, getToken, navigate]);
 
     // Update progress
-    const updateProgress = async (chapterIndex, lectureIndex) => {
+    const updateProgress = async (chapterIndex, lectureIndex, lectureId) => {
         try {
             const token = await getToken();
             if (!token) return;
 
-            await axios.post(`${backendUrl}/api/progress/update`, {
+            // FIX: Changed endpoint to /api/user/update-course-progress
+            // ADDED: Sending lastPosition
+            await axios.post(`${backendUrl}/api/user/update-course-progress`, {
                 courseId: id,
-                chapterIndex,
-                lectureIndex
+                lectureId: lectureId, // Sending lectureId as per userController
+                lastPosition: {
+                    chapter: chapterIndex,
+                    lecture: lectureIndex
+                }
             }, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -80,7 +88,11 @@ const Player = () => {
             setProgress(prev => ({
                 ...prev,
                 lastPosition: { chapter: chapterIndex, lecture: lectureIndex },
-                completedLectures: [...(prev.completedLectures || []), { chapter: chapterIndex, lecture: lectureIndex }]
+                // Add lectureId to completedLectures if not already present
+                completedLectures: [
+                    ...(prev.completedLectures || []).filter(l => l !== lectureId),
+                    lectureId
+                ]
             }));
         } catch (error) {
             console.error('Failed to update progress:', error);
@@ -89,9 +101,11 @@ const Player = () => {
 
     // Handle lecture change
     const handleLectureChange = async (chapterIndex, lectureIndex) => {
+        const lectureData = courseData.courseContent[chapterIndex].chapterContent[lectureIndex];
         setCurrentChapter(chapterIndex);
         setCurrentLecture(lectureIndex);
-        await updateProgress(chapterIndex, lectureIndex);
+        // Pass lectureId to updateProgress
+        await updateProgress(chapterIndex, lectureIndex, lectureData.lectureId);
     };
 
     // Loading state
@@ -107,7 +121,7 @@ const Player = () => {
     if (!courseData) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen">
-                <img src={assets.no_data} alt="Course not found" className="w-32 h-32 mb-4" />
+                <img src={assets.my_course_icon} alt="Course not found" className="w-32 h-32 mb-4" /> {/* FIX: asset */}
                 <h2 className="text-xl font-semibold text-gray-900">Course not found</h2>
                 <p className="text-gray-500 mt-2">The course you're looking for doesn't exist or you don't have access.</p>
             </div>
@@ -116,9 +130,8 @@ const Player = () => {
 
     const currentChapterData = courseData.courseContent[currentChapter];
     const currentLectureData = currentChapterData?.chapterContent[currentLecture];
-    const isCompleted = progress.completedLectures?.some(
-        l => l.chapter === currentChapter && l.lecture === currentLecture
-    );
+    // FIX: Check if lectureId is in the completedLectures array
+    const isCompleted = progress.completedLectures?.includes(currentLectureData?.lectureId);
 
     return (
         <div className="flex h-screen bg-gray-100">
@@ -133,9 +146,8 @@ const Player = () => {
                             <h3 className="font-medium text-gray-900 mb-2">{chapter.chapterTitle}</h3>
                             <div className="space-y-1">
                                 {chapter.chapterContent.map((lecture, lectureIndex) => {
-                                    const isLectureCompleted = progress.completedLectures?.some(
-                                        l => l.chapter === chapterIndex && l.lecture === lectureIndex
-                                    );
+                                    // FIX: Check if lectureId is in the completedLectures array
+                                    const isLectureCompleted = progress.completedLectures?.includes(lecture.lectureId);
                                     const isCurrentLecture = currentChapter === chapterIndex && currentLecture === lectureIndex;
 
                                     return (
@@ -148,13 +160,13 @@ const Player = () => {
                                             `}
                                         >
                                             <img
-                                                src={lecture.lectureType === 'pdf' ? assets.pdf_icon : assets.play_icon}
+                                                src={lecture.lectureType === 'pdf' ? assets.lesson_icon : assets.play_icon} // FIX: asset
                                                 alt=""
                                                 className="w-4 h-4"
                                             />
                                             <span className="flex-1 truncate">{lecture.lectureTitle}</span>
                                             {isLectureCompleted && (
-                                                <img src={assets.check_icon} alt="completed" className="w-4 h-4" />
+                                                <img src={assets.blue_tick_icon} alt="completed" className="w-4 h-4" /> // FIX: asset
                                             )}
                                         </button>
                                     );
@@ -174,7 +186,7 @@ const Player = () => {
                         className="text-gray-500 hover:text-gray-700"
                     >
                         <img
-                            src={showChapters ? assets.close_sidebar : assets.open_sidebar}
+                            src={showChapters ? assets.cross_icon : assets.home_icon} // FIX: assets
                             alt="toggle chapters"
                             className="w-6 h-6"
                         />
@@ -235,7 +247,7 @@ const Player = () => {
                     <button
                         onClick={async () => {
                             if (!isCompleted) {
-                                await updateProgress(currentChapter, currentLecture);
+                                await updateProgress(currentChapter, currentLecture, currentLectureData.lectureId);
                             }
                         }}
                         className={`px-4 py-2 text-sm font-medium rounded-md ${

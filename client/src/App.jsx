@@ -1,5 +1,5 @@
-import React from 'react'; // Removed unused useContext
-import { Routes, Route, useMatch } from 'react-router-dom'; // Removed unused useLocation
+import React from 'react';
+import { Routes, Route, useMatch } from 'react-router-dom';
 import Navbar from './components/student/Navbar';
 import Home from './pages/student/Home';
 import CourseDetails from './pages/student/CourseDetails';
@@ -14,11 +14,8 @@ import 'react-toastify/dist/ReactToastify.css';
 import { ToastContainer } from 'react-toastify';
 import Player from './pages/student/Player';
 import MyEnrollments from './pages/student/MyEnrollments';
-// Removed Loading import as the route is removed
-// import Loading from './components/student/Loading';
 
 const App = () => {
-
   const isEducatorRoute = useMatch('/educator/*');
 
   return (
@@ -28,19 +25,22 @@ const App = () => {
       {!isEducatorRoute && <Navbar />}
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/course/:id" element={<CourseDetails />} />
+        
+        {/* FIX: Changed path to match the CourseCard links */}
+        <Route path="/course-details/:id" element={<CourseDetails />} />
+        
         <Route path="/course-list" element={<CoursesList />} />
         <Route path="/course-list/:input" element={<CoursesList />} />
         <Route path="/my-enrollments" element={<MyEnrollments />} />
         <Route path="/player/:courseId" element={<Player />} />
-        {/* Removed the loading route */}
-        {/* <Route path="/loading/:path" element={<Loading />} /> */}
-        <Route path='/educator' element={<Educator />}>
+        
+        <Route path="/educator" element={<Educator />}>
           {/* Use index route for the dashboard */}
           <Route index element={<Dashboard />} />
-          <Route path='add-course' element={<AddCourse />} />
-          <Route path='my-courses' element={<MyCourses />} />
-          <Route path='student-enrolled' element={<StudentsEnrolled />} />
+          {/* FIX: Corrected component name from AddCode to AddCourse */}
+          <Route path="add-course" element={<AddCourse />} />
+          <Route path="my-courses" element={<MyCourses />} />
+          <Route path="student-enrolled" element={<StudentsEnrolled />} />
         </Route>
       </Routes>
     </div>
@@ -48,3 +48,4 @@ const App = () => {
 };
 
 export default App;
+

@@ -14,8 +14,11 @@ const getYouTubeVideoId = (url) => {
         if (shortMatch && shortMatch[1]) return shortMatch[1];
         const embedMatch = trimmed.match(/\/embed\/([a-zA-Z0-9_-]{11})/);
         if (embedMatch && embedMatch[1]) return embedMatch[1];
-        const anyMatch = trimmed.match(/([a-zA-Z0-9_-]{11})/);
-        if (anyMatch && anyMatch[1]) return anyMatch[1];
+        // A more general regex to catch video IDs from various URL formats
+        const anyMatch = trimmed.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/);
+        if (anyMatch && anyMatch[2] && anyMatch[2].length === 11) {
+             return anyMatch[2];
+        }
         return null;
     } catch (error) {
         console.error("Error parsing YouTube URL:", url, error);
@@ -52,7 +55,8 @@ const CourseDetails = () => {
                 setIsLoadingCourse(true);
                 const token = await getToken();
                 const headers = token ? { Authorization: `Bearer ${token}` } : {};
-                const response = await axios.get(`${backendUrl}/api/course/${id}`, { headers });
+                // FIX: Changed endpoint to /api/course/details/:id to match server route
+                const response = await axios.get(`${backendUrl}/api/course/details/${id}`, { headers });
 
                 if (response.data?.success) {
                     setCourseData(response.data.courseData);
@@ -73,7 +77,8 @@ const CourseDetails = () => {
     // Check enrollment status
     useEffect(() => {
         if (!isLoadingCourse && !isUserDataLoading && userData && courseData) {
-            setIsAlreadyEnrolled(courseData.enrolledStudents?.includes(userData._id));
+            // Use .some() for safer check on array of strings
+            setIsAlreadyEnrolled(courseData.enrolledStudents?.some(studentId => studentId === userData._id));
         }
     }, [isLoadingCourse, isUserDataLoading, userData, courseData]);
 
@@ -114,21 +119,25 @@ const CourseDetails = () => {
                 toast.error('Authentication failed');
                 return;
             }
-
-            const response = await axios.post(`${backendUrl}/api/course/enroll`, {
-                courseId: courseData._id,
+            
+            // FIX: Calling the correct endpoint as defined in courseRoute.js
+            const enrollResponse = await axios.post(`${backendUrl}/api/course/${courseData._id}/enroll`, {
                 accessCode: accessCode.trim()
             }, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
 
-            if (response.data.success) {
+
+            if (enrollResponse.data.success) {
                 toast.success('Successfully enrolled in the course!');
                 setIsAlreadyEnrolled(true);
                 navigate(`/player/${courseData._id}`);
+            } else {
+                 // Throw an error to be caught below if not successful
+                 throw new Error(enrollResponse.data.message || 'Enrollment failed');
             }
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Invalid access code');
+            toast.error(error.response?.data?.message || 'Invalid access code or enrollment failed');
         } finally {
             setIsEnrolling(false);
         }
@@ -167,7 +176,7 @@ const CourseDetails = () => {
                         {courseData.courseTitle || 'Untitled Course'}
                     </h1>
 
-                    <p className="pt-4 md:text-base text-sm"
+                    <p className="pt-4 md:text-base text-sm rich-text" // Added rich-text class
                         dangerouslySetInnerHTML={{ __html: courseData.courseDescription }} 
                     />
 
@@ -198,7 +207,7 @@ const CourseDetails = () => {
                                     >
                                         <span className="font-medium text-gray-800">{chapter.chapterTitle}</span>
                                         <img
-                                            src={assets.down_arrow}
+                                            src={assets.down_arrow_icon} // FIX: using correct asset
                                             alt="toggle"
                                             className={`w-4 h-4 transition-transform ${openSections[index] ? 'rotate-180' : ''}`}
                                         />
@@ -212,7 +221,7 @@ const CourseDetails = () => {
                                                 >
                                                     <div className="flex items-center gap-2">
                                                         <img
-                                                            src={lecture.lectureType === 'pdf' ? assets.pdf_icon : assets.play_icon}
+                                                            src={lecture.lectureType === 'pdf' ? assets.lesson_icon : assets.play_icon} // FIX: using lesson_icon for PDF
                                                             alt="content type"
                                                             className="w-4 h-4"
                                                         />
@@ -240,14 +249,14 @@ const CourseDetails = () => {
                 <div className="md:w-96 w-full md:sticky md:top-24">
                     <div className="bg-white rounded-lg shadow-md p-6">
                         <img
-                            src={courseData.courseThumbnail || assets.thumbnail_placeholder}
+                            src={courseData.courseThumbnail || assets.course_1_thumbnail} // FIX: added fallback asset
                             alt={courseData.courseTitle}
                             className="w-full aspect-video object-cover rounded-lg mb-6"
                         />
 
                         <div className="flex items-center justify-between text-sm mb-6">
                             <div className="flex items-center gap-1">
-                                <img src={assets.enrolled_icon} alt="enrolled" className="w-4 h-4" />
+                                <img src={assets.patients_icon} alt="enrolled" className="w-4 h-4" /> {/* FIX: using correct asset */}
                                 <span>{courseData.enrolledStudents?.length || 0} students</span>
                             </div>
                             <div className="flex items-center gap-1">
@@ -297,19 +306,19 @@ const CourseDetails = () => {
                             <h3 className="text-lg font-medium text-gray-800 mb-3">This course includes:</h3>
                             <ul className="space-y-2 text-sm text-gray-600">
                                 <li className="flex items-center gap-2">
-                                    <img src={assets.video_icon} alt="" className="w-4 h-4" />
+                                    <img src={assets.play_icon} alt="" className="w-4 h-4" /> {/* FIX: using correct asset */}
                                     Video lectures
                                 </li>
                                 <li className="flex items-center gap-2">
-                                    <img src={assets.pdf_icon} alt="" className="w-4 h-4" />
+                                    <img src={assets.lesson_icon} alt="" className="w-4 h-4" /> {/* FIX: using correct asset */}
                                     PDF resources
                                 </li>
                                 <li className="flex items-center gap-2">
-                                    <img src={assets.lifetime_icon} alt="" className="w-4 h-4" />
+                                    <img src={assets.time_left_clock_icon} alt="" className="w-4 h-4" /> {/* FIX: using correct asset */}
                                     Full lifetime access
                                 </li>
                                 <li className="flex items-center gap-2">
-                                    <img src={assets.certificate_icon} alt="" className="w-4 h-4" />
+                                    <img src={assets.blue_tick_icon} alt="" className="w-4 h-4" /> {/* FIX: using correct asset */}
                                     Certificate of completion
                                 </li>
                             </ul>

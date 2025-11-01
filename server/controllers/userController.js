@@ -21,7 +21,7 @@ export const getUserData = async (req, res) => {
     }
 };
 
-// Enroll Course (Replaces purchaseCourse)
+// Enroll Course (This is redundant, the one in courseController is used)
 export const enrollCourse = async (req, res) => {
     try {
         const { courseId } = req.body;
@@ -61,7 +61,13 @@ export const userEnrolledCourses = async (req, res) => {
     try {
         const userId = req.auth.userId;
         const userData = await User.findById(userId)
-            .populate('enrolledCourses');
+            .populate({
+                path: 'enrolledCourses',
+                populate: {
+                    path: 'educator',
+                    select: 'name' // Populate educator name in enrolled courses
+                }
+            });
 
         res.json({ success: true, enrolledCourses: userData.enrolledCourses });
 
@@ -74,20 +80,23 @@ export const userEnrolledCourses = async (req, res) => {
 export const updateUserCourseProgress = async (req, res) => {
     try {
         const userId = req.auth.userId;
-        const { courseId, lectureId } = req.body;
+        const { courseId, lectureId, lastPosition } = req.body; // ADDED lastPosition
         const progressData = await CourseProgress.findOne({ userId, courseId });
 
         if (progressData) {
-            if (progressData.lectureCompleted.includes(lectureId)) {
-                return res.json({ success: true, message: 'Lecture Already Completed' });
+            if (!progressData.lectureCompleted.includes(lectureId)) { // Only push if not included
+                 progressData.lectureCompleted.push(lectureId);
             }
-            progressData.lectureCompleted.push(lectureId);
+            if (lastPosition) { // ADDED: Update last position
+                progressData.lastPosition = lastPosition;
+            }
             await progressData.save();
         } else {
             await CourseProgress.create({
                 userId,
                 courseId,
-                lectureCompleted: [lectureId]
+                lectureCompleted: [lectureId],
+                lastPosition: lastPosition || { chapter: 0, lecture: 0 } // ADDED
             });
         }
         res.json({ success: true, message: 'Progress Updated' });
