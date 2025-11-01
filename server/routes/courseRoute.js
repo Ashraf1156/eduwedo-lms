@@ -1,34 +1,31 @@
-import express from 'express';
-import { 
-    createCourse, 
-    getAllCourse, 
-    getCourseId, 
-    enrollCourse,
-    getEnrolledCourses,
-    getEnrolledCourse,
-    getMyCourses,
-    updateCourse,
-    deleteCourse,
-    getStudentsByAccessCode
-} from '../controllers/courseController.js';
-import { requireAuth, extractUser } from '../middlewares/authMiddleware.js';
+// ========== courseRoutes.js ==========
+import express from "express";
+import {
+  getAllCourses,
+  getCourseById,
+  enrollCourse,
+  getEnrolledCourses,
+  updateProgress,
+} from "../controllers/courseController.js";
+import { requireAuth } from "@clerk/express";
 
 const router = express.Router();
 
-// Public routes
-router.get('/all', getAllCourse);
+// ✅ ORDER IS IMPORTANT: more specific routes first
 
-// Protected routes - More specific routes first
-router.post('/create', requireAuth, extractUser, createCourse);
-router.get('/enrolled', requireAuth, extractUser, getEnrolledCourses);
-router.get('/enrolled/:courseId', requireAuth, extractUser, getEnrolledCourse);
-router.get('/my-courses', requireAuth, extractUser, getMyCourses);
-router.get('/students/:accessCode', requireAuth, extractUser, getStudentsByAccessCode);
-router.post('/enroll', requireAuth, extractUser, enrollCourse);
+// 🟢 Get all published courses
+router.get("/all", getAllCourses);
 
-// Protected routes with courseId parameter
-router.get('/:courseId', requireAuth, extractUser, getCourseId);
-router.put('/:courseId', requireAuth, extractUser, updateCourse);
-router.delete('/:courseId', requireAuth, extractUser, deleteCourse);
+// 🟢 Get enrolled courses for a specific user
+router.get("/user/:userId/enrolled", requireAuth(), getEnrolledCourses);
+
+// 🟢 Enroll in a course
+router.post("/:courseId/enroll", requireAuth(), enrollCourse);
+
+// 🟢 Update progress in a course
+router.put("/:courseId/progress", requireAuth(), updateProgress);
+
+// 🟢 Get single course by ID (keep this LAST to avoid conflicts)
+router.get("/details/:courseId", getCourseById);
 
 export default router;

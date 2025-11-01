@@ -45,28 +45,35 @@ const CourseDetails = () => {
         calculateNoOfLectures
     } = useContext(AppContext);
 
-    // Fetch course data
+    // ✅ Fixed Fetch Course Data (handles both logged-in & public)
     useEffect(() => {
         const fetchCourseData = async () => {
             try {
-                const response = await axios.get(`${backendUrl}/api/course/${id}`);
-                if (response.data.success) {
+                setIsLoadingCourse(true);
+                const token = await getToken();
+                const headers = token ? { Authorization: `Bearer ${token}` } : {};
+                const response = await axios.get(`${backendUrl}/api/course/${id}`, { headers });
+
+                if (response.data?.success) {
                     setCourseData(response.data.courseData);
+                } else {
+                    toast.error("Course not found or unavailable");
                 }
             } catch (error) {
-                toast.error('Failed to fetch course details');
+                console.error("Course fetch error:", error);
+                toast.error(error.response?.data?.message || 'Failed to fetch course details');
             } finally {
                 setIsLoadingCourse(false);
             }
         };
 
         fetchCourseData();
-    }, [backendUrl, id]);
+    }, [backendUrl, id, getToken]);
 
     // Check enrollment status
     useEffect(() => {
         if (!isLoadingCourse && !isUserDataLoading && userData && courseData) {
-            setIsAlreadyEnrolled(courseData.enrolledStudents.includes(userData._id));
+            setIsAlreadyEnrolled(courseData.enrolledStudents?.includes(userData._id));
         }
     }, [isLoadingCourse, isUserDataLoading, userData, courseData]);
 
@@ -128,7 +135,7 @@ const CourseDetails = () => {
     };
 
     // Preview lecture
-    const handlePreview = async (lecture) => {
+    const handlePreview = (lecture) => {
         if (lecture.isPreviewFree) {
             setPlayerData(lecture);
         } else {
@@ -144,6 +151,10 @@ const CourseDetails = () => {
         return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
     }
 
+    if (!courseData) {
+        return <div className="flex justify-center items-center min-h-screen text-gray-600">Course not found</div>;
+    }
+
     return (
         <>
             <div className="flex md:flex-row flex-col-reverse gap-10 relative items-start justify-between md:px-36 px-8 md:pt-20 pt-10 text-left min-h-screen">
@@ -152,19 +163,14 @@ const CourseDetails = () => {
 
                 {/* Left Column: Course Info */}
                 <div className="max-w-xl z-10 text-gray-500">
-                    {/* Title */}
                     <h1 className="md:text-course-deatails-heading-large text-course-deatails-heading-small font-semibold text-gray-800">
                         {courseData.courseTitle || 'Untitled Course'}
                     </h1>
 
-                    {/* Description */}
                     <p className="pt-4 md:text-base text-sm"
-                        dangerouslySetInnerHTML={{ 
-                            __html: courseData.courseDescription 
-                        }} 
+                        dangerouslySetInnerHTML={{ __html: courseData.courseDescription }} 
                     />
 
-                    {/* Meta Info */}
                     <div className='flex items-center gap-4 pt-4 text-sm'>
                         <div className="flex items-center gap-1" title={`${safeRating} rating`}>
                             <img src={assets.star} alt="star icon" className='w-4 h-4' />
@@ -233,14 +239,12 @@ const CourseDetails = () => {
                 {/* Right Column: Enrollment Card */}
                 <div className="md:w-96 w-full md:sticky md:top-24">
                     <div className="bg-white rounded-lg shadow-md p-6">
-                        {/* Course Thumbnail */}
                         <img
                             src={courseData.courseThumbnail || assets.thumbnail_placeholder}
                             alt={courseData.courseTitle}
                             className="w-full aspect-video object-cover rounded-lg mb-6"
                         />
 
-                        {/* Course Stats */}
                         <div className="flex items-center justify-between text-sm mb-6">
                             <div className="flex items-center gap-1">
                                 <img src={assets.enrolled_icon} alt="enrolled" className="w-4 h-4" />
@@ -271,7 +275,6 @@ const CourseDetails = () => {
                             </div>
                         )}
 
-                        {/* Enroll Button */}
                         <button
                             onClick={enrollCourse}
                             disabled={isEnrolling || isUserDataLoading || !courseData?._id}
@@ -290,7 +293,6 @@ const CourseDetails = () => {
                                 : 'Enroll Now'}
                         </button>
 
-                        {/* Course Features */}
                         <div className="mt-6">
                             <h3 className="text-lg font-medium text-gray-800 mb-3">This course includes:</h3>
                             <ul className="space-y-2 text-sm text-gray-600">
